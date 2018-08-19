@@ -1,9 +1,11 @@
-from monkey import lexer, parser, token
+from monkey import evaluator, lexer, object,parser
 
 PROMPT = '>> '
 
 
 def start():
+    env = object.Environment()
+
     while True:
         line = input(PROMPT)
         if not line:
@@ -17,7 +19,9 @@ def start():
             print_parse_errors(p.errors)
             continue
 
-        print(program.string())
+        evaluated = evaluator.eval(program, env)
+        if evaluated is not None:
+            print(evaluated.inspect())
 
 
 MONKEY_FACE = r'''            __,__
