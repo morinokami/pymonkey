@@ -28,6 +28,10 @@ def test_next_token():
 
     10 == 10;
     10 != 9;
+    "foobar"
+    "foo bar"
+    [1, 2];
+    {"foo": "bar"}
     '''
     tests = [
         Target(token.LET, 'let'),
@@ -103,6 +107,19 @@ def test_next_token():
         Target(token.NOT_EQ, '!='),
         Target(token.INT, '9'),
         Target(token.SEMICOLON, ';'),
+        Target(token.STRING, 'foobar'),
+        Target(token.STRING, 'foo bar'),
+        Target(token.LBRACKET, '['),
+        Target(token.INT, '1'),
+        Target(token.COMMA, ','),
+        Target(token.INT, '2'),
+        Target(token.RBRACKET, ']'),
+        Target(token.SEMICOLON, ';'),
+        Target(token.LBRACE, '{'),
+        Target(token.STRING, 'foo'),
+        Target(token.COLON, ':'),
+        Target(token.STRING, 'bar'),
+        Target(token.RBRACE, '}'),
         Target(token.EOF, ''),
     ]
 

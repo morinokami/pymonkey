@@ -159,6 +159,10 @@ def test_error_handling():
             'unknown operator: BOOLEAN + BOOLEAN',
         ),
         T(
+            '"Hello" - "World";',
+            'unknown operator: STRING - STRING',
+        ),
+        T(
             'if (10 > 1) { true + false; }',
             'unknown operator: BOOLEAN + BOOLEAN',
         ),
@@ -177,6 +181,10 @@ def test_error_handling():
         T(
             'foobar',
             'identifier not found: foobar'
+        ),
+        T(
+            '{"name": "Monkey"}[fn(x) { x }];',
+            'unusable as hash key: FUNCTION',
         ),
     ]
 
@@ -252,6 +260,228 @@ def test_enclosing_environments():
     _test_integer_object(_test_eval(input), 70)
 
 
+def test_closures():
+    input = '''
+    let newAdder = fn(x) {
+      fn(y) { x + y };
+    };
+    
+    let addTwo = newAdder(2);
+    addTwo(2);
+    '''
+
+    _test_integer_object(_test_eval(input), 4)
+
+
+def test_string_literal():
+    input = '"Hello World!"'
+
+    evaluated = _test_eval(input)
+    assert issubclass(evaluated.__class__, object.String), \
+        'object is not String. got={} ({})'.format(evaluated.__class__.__name__, evaluated)
+
+    assert evaluated.value == 'Hello World!', \
+        'String has wrong value. got={}'.format(evaluated.value)
+
+
+def test_string_concatenation():
+    input = '"Hello" + " " + "World!"'
+
+    evaluated = _test_eval(input)
+    assert issubclass(evaluated.__class__, object.String), \
+        'object is not String. got={} ({})'.format(evaluated.__class__.__name__, evaluated)
+
+    assert evaluated.value == 'Hello World!', \
+        'String has wrong value. got={}'.format(evaluated.value)
+
+
+def test_builtin_functions():
+    tests = [
+        T('len("")', 0),
+        T('len("four")', 4),
+        T('len("hello world")', 11),
+        T('len(1)', 'argument to `len` not supported, got INTEGER'),
+        T('len("one", "two")', 'wrong number of arguments. got=2, want=1'),
+        T('len([1, 2, 3])', 3),
+        T('len([])', 0),
+        T('puts("hello", "world!")', None),
+        T('first([1, 2, 3])', 1),
+        T('first([])', None),
+        T('first(1)', "argument to `first` must be ARRAY, got INTEGER"),
+        T('last([1, 2, 3])', 3),
+        T('last([])', None),
+        T('last(1)', "argument to `last` must be ARRAY, got INTEGER"),
+        T('rest([1, 2, 3])', [2, 3]),
+        T('rest([])', None),
+        T('push([], 1)', [1]),
+        T('push(1, 1)', "argument to `push` must be ARRAY, got INTEGER"),
+    ]
+
+    for tt in tests:
+        evaluated = _test_eval(tt.input)
+
+        if type(tt.expected) == int:
+            _test_integer_object(evaluated, tt.expected)
+        elif tt.expected is None:
+            _test_null_object(evaluated)
+        elif type(tt.expected) == str:
+            assert issubclass(evaluated.__class__, object.Error), \
+                'object is not Error. got={} ({})'.format(evaluated.__class__.__name__, evaluated)
+            assert evaluated.message == tt.expected, \
+                "wrong error message. expected='{}', got='{}'".format(tt.expected, evaluated.message)
+        elif type(tt.expected) == list and all(type(e) == int for e in tt.expected):
+            assert issubclass(evaluated.__class__, object.Array), \
+                'obj not Array. got={} ({})'.format(evaluated.__class__.__name__, evaluated)
+            assert len(evaluated.elements) == len(tt.expected), \
+                'wrong num of elements. want={}, got={}'.format(len(tt.expected), len(evaluated.elements))
+            for i, expected_elem in enumerate(tt.expected):
+                _test_integer_object(evaluated.elements[i], expected_elem)
+
+
+def test_array_literals():
+    input = '[1, 2 * 2, 3 + 3]'
+
+    evaluated = _test_eval(input)
+    assert issubclass(evaluated.__class__, object.Array), \
+        'object is not Array. got={} ({})'.format(evaluated.__class__.__name__, evaluated)
+
+    assert len(evaluated.elements) == 3, \
+        'array has wrong num of elements. got={}'.format(len(evaluated.elements))
+
+    _test_integer_object(evaluated.elements[0], 1)
+    _test_integer_object(evaluated.elements[1], 4)
+    _test_integer_object(evaluated.elements[2], 6)
+
+
+def test_array_index_expressions():
+    tests = [
+        T(
+            '[1, 2, 3][0]',
+            1,
+        ),
+        T(
+            '[1, 2, 3][1]',
+            2,
+        ),
+        T(
+            '[1, 2, 3][2]',
+            3,
+        ),
+        T(
+            'let i = 0; [1][i];',
+            1,
+        ),
+        T(
+            '[1, 2, 3][1 + 1];',
+            3,
+        ),
+        T(
+            'let myArray = [1, 2, 3]; myArray[2];',
+            3,
+        ),
+        T(
+            'let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];',
+            6,
+        ),
+        T(
+            'let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]',
+            2,
+        ),
+        T(
+            '[1, 2, 3][3]',
+            None,
+        ),
+        T(
+            '[1, 2, 3][-1]',
+            None,
+        ),
+    ]
+
+    for tt in tests:
+        evaluated = _test_eval(tt.input)
+        if type(tt.expected) == int:
+            _test_integer_object(evaluated, tt.expected)
+        else:
+            _test_null_object(evaluated)
+
+
+def test_hash_literals():
+    input = '''
+    let two = "two";
+    {
+        "one": 10 - 9,
+        two: 1 + 1,
+        "thr" + "ee": 6 / 2,
+        4: 4,
+        true: 5,
+        false: 6
+    }
+    '''
+
+    evaluated = _test_eval(input)
+    assert issubclass(evaluated.__class__, object.Hash), \
+        "Eval didn't return Hash. got={} ({})".format(evaluated.__class__.__name__, evaluated)
+
+    expected = {
+        object.String('one').hash_key(): 1,
+        object.String('two').hash_key(): 2,
+        object.String('three').hash_key(): 3,
+        object.Integer(4).hash_key(): 4,
+        evaluator.TRUE.hash_key(): 5,
+        evaluator.FALSE.hash_key(): 6,
+    }
+
+    assert len(evaluated.pairs) == len(expected), \
+        'Hash has wrong num of pairs. got={}'.format(len(evaluated.pairs))
+
+    for expected_key, expected_value in expected.items():
+        assert expected_key in evaluated.pairs, \
+            'no pair for given key in pairs: ' + str(expected_key)
+        pair = evaluated.pairs[expected_key]
+
+        _test_integer_object(pair.value, expected_value)
+
+
+def test_hash_index_expressions():
+    tests = [
+        T(
+            '{"foo": 5}["foo"]',
+            5,
+        ),
+        T(
+            '{"foo": 5}["bar"]',
+            None,
+        ),
+        T(
+            'let key = "foo"; {"foo": 5}[key]',
+            5,
+        ),
+        T(
+            '{}["foo"]',
+            None,
+        ),
+        T(
+            '{5: 5}[5]',
+            5,
+        ),
+        T(
+            '{true: 5}[true]',
+            5,
+        ),
+        T(
+            '{false: 5}[false]',
+            5,
+        ),
+    ]
+
+    for tt in tests:
+        evaluated = _test_eval(tt.input)
+        if type(tt.expected) == int:
+            _test_integer_object(evaluated, tt.expected)
+        else:
+            _test_null_object(evaluated)
+
+
 def _test_eval(input: str) -> object.Object:
     l = lexer.Lexer(input)
     p = parser.Parser(l)
@@ -278,5 +508,5 @@ def _test_boolean_object(obj: object.Object, expected: bool):
 
 
 def _test_null_object(obj: object.Object):
-    assert obj is not evaluator.NULL, \
+    assert obj is evaluator.NULL, \
         'object is not NULL. got={} ({})'.format(obj.__class__.__name__, obj)

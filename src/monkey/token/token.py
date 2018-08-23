@@ -8,6 +8,7 @@ EOF = "EOF"  # 1343456
 # Identifiers + literals
 IDENT = 'IDENT'
 INT = 'INT'
+STRING = 'STRING'
 
 # Operators
 ASSIGN = '='
@@ -26,11 +27,14 @@ NOT_EQ = '!='
 # Delimiters
 COMMA = ','
 SEMICOLON = ';'
+COLON = ':'
 
 LPAREN = '('
 RPAREN = ')'
 LBRACE = '{'
 RBRACE = '}'
+LBRACKET = '['
+RBRACKET = ']'
 
 # Keywords
 FUNCTION = 'FUNCTION'

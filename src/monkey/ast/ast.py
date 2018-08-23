@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import Dict, List
 
 from monkey import token
 
@@ -325,5 +325,98 @@ class CallExpression(Expression):
         out += '('
         out += ', '.join(args)
         out += ')'
+
+        return out
+
+
+class StringLiteral(Expression):
+
+    def __init__(self, token: token.Token, value: str = None):
+        self.token = token
+        self.value = value
+
+    def expression_node(self):
+        pass
+
+    def token_literal(self):
+        return self.token.literal
+
+    def string(self):
+        return self.token.literal
+
+
+class ArrayLiteral(Expression):
+
+    def __init__(self, token: token.Token, elements: List[Expression] = None):
+        self.token = token
+        self.elements = elements
+
+    def expression_node(self):
+        pass
+
+    def token_literal(self):
+        return self.token.literal
+
+    def string(self):
+        out = ''
+
+        elements: List[str] = []
+        for el in self.elements:
+            elements.append(el.string())
+
+        out += '['
+        out += ', '.join(elements)
+        out += ']'
+
+        return out
+
+
+class IndexExpression(Expression):
+
+    def __init__(self, token: token.Token, left: Expression = None, index: Expression = None):
+        self.token = token
+        self.left = left
+        self.index = index
+
+    def expression_node(self):
+        pass
+
+    def token_literal(self):
+        return self.token.literal
+
+    def string(self):
+        out = ''
+
+        out += '('
+        out += self.left.string()
+        out += '['
+        out += self.index.string()
+        out += '])'
+
+        return out
+
+
+class HashLiteral(Expression):
+
+    def __init__(self, token: token.Token, pairs: Dict[Expression, Expression] = None):
+        self.token = token
+        self.pairs = pairs
+
+    def expression_node(self):
+        pass
+
+    def token_literal(self):
+        return self.token.literal
+
+    def string(self):
+        out = ''
+
+        pairs: List[str]
+        for key, value in self.pairs.items():
+            pairs.append(key.string() + ':' + value.string())
+
+        out += '{'
+        out += ', '.join(pairs)
+        out += '}'
 
         return out

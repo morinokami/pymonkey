@@ -46,6 +46,8 @@ class Lexer:
             tok = Lexer.new_token(token.GT, self.ch)
         elif self.ch == ';':
             tok = Lexer.new_token(token.SEMICOLON, self.ch)
+        elif self.ch == ':':
+            tok = Lexer.new_token(token.COLON, self.ch)
         elif self.ch == '(':
             tok = Lexer.new_token(token.LPAREN, self.ch)
         elif self.ch == ')':
@@ -58,6 +60,13 @@ class Lexer:
             tok = Lexer.new_token(token.LBRACE, self.ch)
         elif self.ch == '}':
             tok = Lexer.new_token(token.RBRACE, self.ch)
+        elif self.ch == '"':
+            tok.type = token.STRING
+            tok.literal = self.read_string()
+        elif self.ch == '[':
+            tok = Lexer.new_token(token.LBRACKET, self.ch)
+        elif self.ch == ']':
+            tok = Lexer.new_token(token.RBRACKET, self.ch)
         elif self.ch is chr(0):
             tok = Lexer.new_token(token.EOF, '')
         else:
@@ -104,6 +113,14 @@ class Lexer:
         position = self.position
         while Lexer.is_digit(self.ch):
             self.read_char()
+        return self.input[position:self.position]
+
+    def read_string(self):
+        position = self.position + 1
+        while True:
+            self.read_char()
+            if self.ch == '"' or self.ch == chr(0):
+                break
         return self.input[position:self.position]
 
     @classmethod

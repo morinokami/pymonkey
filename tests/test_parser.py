@@ -283,6 +283,14 @@ def test_operator_precedence_parsing():
             'add(a + b + c * d / f + g)',
             'add((((a + b) + ((c * d) / f)) + g))',
         ),
+        Test(
+            'a * [1, 2, 3, 4][b * c] * d',
+            '((a * ([1, 2, 3, 4][(b * c)])) * d)',
+        ),
+        Test(
+            'add(a * b[2], b[1], 2 * [1, 2][1])',
+            'add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))',
+        ),
     ]
 
     for tt in tests:
@@ -492,6 +500,221 @@ def test_call_expression_parsing():
     _test_literal_expression(exp.arguments[0], 1)
     _test_infix_expression(exp.arguments[1], 2, '*', 3)
     _test_infix_expression(exp.arguments[2], 4, '+', 5)
+
+
+def test_string_literal_expression():
+    input = '"hello world";'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    literal = stmt.expression
+    assert issubclass(literal.__class__, ast.StringLiteral), \
+        'exp not ast.StringLiteral. got={}'.format(stmt.expression.__class__.__name__)
+    assert literal.value == 'hello world', \
+        "literal.value not '{}'. got='{}'".format('hello world', literal.value)
+
+
+def test_parsing_empty_array_literals():
+    input = '[]'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    array = stmt.expression
+    assert issubclass(array.__class__, ast.ArrayLiteral), \
+        'exp not ast.ArrayLiteral. got={}'.format(array.__class__.__name__)
+
+    assert len(array.elements) == 0, \
+        'len(array.Elements) not 0. got={}'.format(len(array.elements))
+
+
+def test_parsing_array_literals():
+    input = '[1, 2 * 2, 3 + 3]'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    array = stmt.expression
+    assert issubclass(array.__class__, ast.ArrayLiteral), \
+        'exp not ast.ArrayLiteral. got={}'.format(array.__class__.__name__)
+
+    assert len(array.elements) == 3, \
+        'len(array.Elements) not 3. got={}'.format(len(array.elements))
+
+    _test_integer_literal(array.elements[0], 1)
+    _test_infix_expression(array.elements[1], 2, '*', 2)
+    _test_infix_expression(array.elements[2], 3, '+', 3)
+
+
+def test_parsing_index_expressions():
+    input = 'myArray[1 + 1]'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    index_exp = stmt.expression
+    assert issubclass(index_exp.__class__, ast.IndexExpression), \
+        'exp not ast.IndexExpression. got={}'.format(index_exp.__class__.__name__)
+
+    assert _test_identifier(index_exp.left, 'myArray')
+
+    assert _test_infix_expression(index_exp.index, 1, '+', 1)
+
+
+def test_parsing_empty_hash_literal():
+    input = '{}'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    hash = stmt.expression
+    assert issubclass(hash.__class__, ast.HashLiteral), \
+        'exp not ast.HashLiteral. got={}'.format(hash.__class__.__name__)
+
+    assert len(hash.pairs) == 0, \
+        'hash.Pairs has wrong length. got={}'.format(len(hash.pairs))
+
+
+def test_parsing_hash_literals_string_keys():
+    input = '{"one": 1, "two": 2, "three": 3}'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    hash = stmt.expression
+    assert issubclass(hash.__class__, ast.HashLiteral), \
+        'exp not ast.HashLiteral. got={}'.format(hash.__class__.__name__)
+
+    expected = {
+        'one': 1,
+        'two': 2,
+        'three': 3,
+    }
+
+    assert len(hash.pairs) == len(expected), \
+        'hash.Pairs has wrong length. got={}'.format(len(hash.pairs))
+
+    for key, value in hash.pairs.items():
+        assert issubclass(key.__class__, ast.StringLiteral), \
+            'key is not ast.StringLiteral. got={}'.format(key.__class__.__name__)
+
+        assert key.string() in expected
+        expected_value = expected[key.string()]
+
+        _test_integer_literal(value, expected_value)
+
+
+def test_parsing_hash_literals_boolean_keys():
+    input = '{true: 1, false: 2}'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    hash = stmt.expression
+    assert issubclass(hash.__class__, ast.HashLiteral), \
+        'exp not ast.HashLiteral. got={}'.format(hash.__class__.__name__)
+
+    expected = {
+        'true': 1,
+        'false': 2,
+    }
+
+    assert len(hash.pairs) == len(expected), \
+        'hash.Pairs has wrong length. got={}'.format(len(hash.pairs))
+
+    for key, value in hash.pairs.items():
+        assert issubclass(key.__class__, ast.Boolean), \
+            'key is not ast.Boolean. got={}'.format(key.__class__.__name__)
+
+        assert key.string() in expected
+        expected_value = expected[key.string()]
+        _test_integer_literal(value, expected_value)
+
+
+def test_parsing_hash_literals_integer_keys():
+    input = '{1: 1, 2: 2, 3: 3}'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    hash = stmt.expression
+    assert issubclass(hash.__class__, ast.HashLiteral), \
+        'exp not ast.HashLiteral. got={}'.format(hash.__class__.__name__)
+
+    expected = {
+        '1': 1,
+        '2': 2,
+        '3': 3,
+    }
+
+    assert len(hash.pairs) == len(expected), \
+        'hash.Pairs has wrong length. got={}'.format(len(hash.pairs))
+
+    for key, value in hash.pairs.items():
+        assert issubclass(key.__class__, ast.IntegerLiteral), \
+            'key is not ast.IntegerLiteral. got={}'.format(key.__class__.__name__)
+
+        assert key.string() in expected
+        expected_value = expected[key.string()]
+        _test_integer_literal(value, expected_value)
+
+
+def test_parsing_hash_literals_integer_keys():
+    input = '{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}'
+
+    l = lexer.Lexer(input)
+    p = parser.Parser(l)
+    program = p.parse_program()
+    check_parser_errors(p)
+
+    stmt = program.statements[0]
+    hash = stmt.expression
+    assert issubclass(hash.__class__, ast.HashLiteral), \
+        'exp not ast.HashLiteral. got={}'.format(hash.__class__.__name__)
+
+    assert len(hash.pairs) == 3, \
+        'hash.Pairs has wrong length. got={}'.format(len(hash.pairs))
+
+    tests = {
+        'one': lambda e: _test_infix_expression(e, 0, '+', 1),
+        'two': lambda e: _test_infix_expression(e, 10, '-', 8),
+        'three': lambda e: _test_infix_expression(e, 15, '/', 5),
+    }
+
+    for key, value in hash.pairs.items():
+        assert issubclass(key.__class__, ast.StringLiteral), \
+            'key is not ast.StringLiteral. got={}'.format(key.__class__.__name__)
+
+        assert key.string() in tests, \
+            "No test function for key '{}' found".format(key.string())
+        test_func = tests[key.string()]
+
+        test_func(value)
 
 
 def _test_let_statement(s: ast.Statement, name: str):

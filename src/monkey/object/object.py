@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, NewType
+from typing import Callable, Dict, List, NewType
 
 from monkey import ast
 
@@ -10,10 +10,38 @@ ERROR_OBJ = 'ERROR'
 
 INTEGER_OBJ = 'INTEGER'
 BOOLEAN_OBJ = 'BOOLEAN'
+STRING_OBJ = 'STRING'
 
 RETURN_VALUE_OBJ = 'RETURN_VALUE'
 
 FUNCTION_OBJ = 'FUNCTION'
+BUILTIN_OBJ = 'BUILTIN'
+
+ARRAY_OBJ = 'ARRAY'
+HASH_OBJ = 'HASH'
+
+
+class HashKey:
+
+    def __init__(self, type: ObjectType, value: int):
+        self.type = type
+        self.value = value
+
+    def __eq__(self, other):
+        return type(self) == type(other) and self.type == other.type and self.value == other.value
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return self.value
+
+
+class Hashable(ABC):
+
+    @abstractmethod
+    def hash_key(self) -> HashKey:
+        raise NotImplementedError
 
 
 class Object(ABC):
@@ -27,7 +55,10 @@ class Object(ABC):
         raise NotImplementedError
 
 
-class Integer(Object):
+BuiltinFunction = NewType('BuiltinFunction', Callable[[List[Object]], Object])
+
+
+class Integer(Object, Hashable):
 
     def __init__(self, value: int):
         self.value = value
@@ -38,8 +69,11 @@ class Integer(Object):
     def inspect(self) -> str:
         return str(self.value)
 
+    def hash_key(self) -> HashKey:
+        return HashKey(self.type(), self.value)
 
-class Boolean(Object):
+
+class Boolean(Object, Hashable):
 
     def __init__(self, value: bool):
         self.value = value
@@ -49,6 +83,11 @@ class Boolean(Object):
 
     def inspect(self) -> str:
         return str(self.value).lower()
+
+    def hash_key(self) -> HashKey:
+        value = 1 if self.value else 0
+
+        return HashKey(self.type(), value)
 
 
 class Null(Object):
@@ -107,5 +146,83 @@ class Function(Object):
         out += ') {\n'
         out += self.body.string()
         out += '\n}'
+
+        return out
+
+
+class String(Object, Hashable):
+
+    def __init__(self, value: str):
+        self.value = value
+
+    def type(self):
+            return STRING_OBJ
+
+    def inspect(self):
+        return self.value
+
+    def hash_key(self) -> HashKey:
+        return HashKey(self.type(), hash(self.value))
+
+
+class Builtin(Object):
+
+    def __init__(self, fn: BuiltinFunction):
+        self.fn = fn
+
+    def type(self):
+        return BUILTIN_OBJ
+
+    def inspect(self):
+        return 'builtin function'
+
+
+class Array(Object):
+
+    def __init__(self, elements: List[Object]):
+        self.elements = elements
+
+    def type(self):
+        return ARRAY_OBJ
+
+    def inspect(self):
+        out = ''
+
+        elements: List[str] = []
+        for e in self.elements:
+            elements.append(e.inspect())
+
+        out += '['
+        out += ', '.join(elements)
+        out += ']'
+
+        return out
+
+
+class HashPair:
+
+    def __init__(self, key: Object, value: Object):
+        self.key = key
+        self.value = value
+
+
+class Hash(Object):
+
+    def __init__(self, pairs: Dict[HashKey, HashPair]):
+        self.pairs = pairs
+
+    def type(self):
+        return HASH_OBJ
+
+    def inspect(self):
+        out = ''
+
+        pairs: List[str] = []
+        for pair in self.pairs.values():
+            pairs.append('{}: {}'.format(pair.key.inspect(), pair.value.inspect()))
+
+        out += '{'
+        out += ', '.join(pairs)
+        out += '}'
 
         return out
